@@ -1,0 +1,50 @@
+image: docker:latest
+
+services:
+  - docker:dind
+
+variables:
+  DOCKER_DRIVER: overlay2
+  MYSQL_ROOT_PASSWORD: $MYSQL_ROOT_PASSWORD
+  INFLUXDB_TOKEN: $INFLUXDB_TOKEN
+  
+stages:
+  - test
+  - security
+  - deploy
+
+before_script:
+  - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+
+test:
+  stage: test
+  services:
+    - docker:dind
+  script:
+    - docker-compose up -d  # Lancer tous les conteneurs définis dans docker-compose.yml
+    - docker-compose exec app npm test  # Exécuter les tests dans le conteneur app
+  only:
+    - main
+
+
+# format_check:
+#   stage: test
+#   script:
+#     - docker-compose run app npm run check-format  # Vérifier le formatage des données pour les graphiques
+#   only:
+#     - main
+
+# security_check:
+#   stage: security
+#   script:
+#     - docker-compose run app npm run security-test  # Lancer des tests de sécurité
+#   only:
+#     - main
+
+deploy:
+  stage: deploy
+  script:
+    - docker-compose run app npm run build
+    - docker-compose run app npm run deploy
+  only:
+    - main
