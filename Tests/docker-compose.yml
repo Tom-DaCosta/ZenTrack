@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  test_curl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    networks:
+      - default
+networks:
+  default:
+    name: acme_network

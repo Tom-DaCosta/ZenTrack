@@ -1,50 +1,44 @@
-image: docker:latest
-
-services:
-  - docker:dind
+stages:
+  - build
+  - test
 
 variables:
-  DOCKER_DRIVER: overlay2
-  MYSQL_ROOT_PASSWORD: $MYSQL_ROOT_PASSWORD
-  INFLUXDB_TOKEN: $INFLUXDB_TOKEN
-  
-stages:
-  - test
-  - security
-  - deploy
+  DOCKER_IMAGE: "my-app"
+  DOCKER_TAG: "latest"
+  DOCKER_HOST: "tcp://docker:2375"
+  DOCKER_TLS_CERTDIR: ""
 
-before_script:
-  - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
-
-test:
-  stage: test
+build_docker:
+  stage: build
+  image: docker:latest
   services:
-    - docker:dind
+    - name: docker:dind
+      alias: docker
   script:
-    - docker-compose up -d  # Lancer tous les conteneurs définis dans docker-compose.yml
-    - docker-compose exec app npm test  # Exécuter les tests dans le conteneur app
-  only:
-    - main
+    - echo "Building Docker image..."
+    - docker build -t $DOCKER_IMAGE:$DOCKER_TAG .
+    - docker save $DOCKER_IMAGE:$DOCKER_TAG > my_app_image.tar
+  artifacts:
+    paths:
+      - my_app_image.tar
 
-
-# format_check:
-#   stage: test
-#   script:
-#     - docker-compose run app npm run check-format  # Vérifier le formatage des données pour les graphiques
-#   only:
-#     - main
-
-# security_check:
-#   stage: security
-#   script:
-#     - docker-compose run app npm run security-test  # Lancer des tests de sécurité
-#   only:
-#     - main
-
-deploy:
-  stage: deploy
+test_docker:
+  stage: test
+  image: docker:latest
+  services:
+    - name: docker:dind
+      alias: docker
+  dependencies:
+    - build_docker
   script:
-    - docker-compose run app npm run build
-    - docker-compose run app npm run deploy
-  only:
-    - main
+    - echo "Loading Docker image..."
+    - docker load < my_app_image.tar
+    - echo "Starting Docker container..."
+    - docker run -d --name my-app -p 8080:80 $DOCKER_IMAGE:$DOCKER_TAG
+    - echo "Testing with curl..."
+    - sleep 5
+    - curl -f http://localhost:8080 || (echo "Test failed" && exit 1)
+  after_script:
+    - docker stop my-app || true
+    - docker rm my-app || true
+

@@ -1,21 +1,14 @@
-# Base image with PHP and Composer
-FROM php:8.0-fpm
+# Utiliser l'image de base officielle d'Alpine pour réduire la taille de l'image
+FROM nginx:alpine
 
-# Installation des extensions PHP et dépendances système
-RUN apt-get update && apt-get install -y \
-    php-mbstring php-xml php-mysql php-curl php-zip php-gd \
-    nodejs npm git unzip \
-    && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+# Définir le répertoire de travail
+WORKDIR /usr/share/nginx/html
 
-# Copie des fichiers de l'application Laravel
-WORKDIR /app
-COPY ./laravel-project /app
+# Copier un fichier HTML dans le conteneur
+COPY index.html .
 
-# Installation des dépendances Laravel
-RUN npm install && composer install
+# Exposer le port 80 pour permettre l'accès au serveur web
+EXPOSE 80
 
-# Exposition du port Laravel
-EXPOSE 8000
-
-# Commande pour démarrer Laravel
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+# Commande de démarrage par défaut pour Nginx
+CMD ["nginx", "-g", "daemon off;"]
